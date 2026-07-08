@@ -15,6 +15,9 @@ import { NoChangesError, runReview, type ReviewStage } from "../core/index.js";
 import { isGitRepository } from "../git/index.js";
 import { ProviderRegistry } from "../provider/index.js";
 import { ClaudeProvider, type ClaudeProviderOptions } from "../provider-anthropic/index.js";
+import { NvidiaProvider, type NvidiaProviderOptions } from "../provider-nvidia/index.js";
+import { OllamaProvider, type OllamaProviderOptions } from "../provider-ollama/index.js";
+import { OpenAIProvider, type OpenAIProviderOptions } from "../provider-openai/index.js";
 import { isMergeReady, reportConsole, reportJson } from "../reporter/index.js";
 import { colors } from "../shared/colors.js";
 import type { ReviewLevel, ReviewType } from "../shared/types.js";
@@ -53,6 +56,18 @@ function buildProviderRegistry(): ProviderRegistry {
     "claude",
     (config) => new ClaudeProvider(config as ClaudeProviderOptions | undefined),
   );
+  registry.register(
+    "openai",
+    (config) => new OpenAIProvider(config as OpenAIProviderOptions | undefined),
+  );
+  registry.register(
+    "nvidia",
+    (config) => new NvidiaProvider(config as NvidiaProviderOptions | undefined),
+  );
+  registry.register(
+    "ollama",
+    (config) => new OllamaProvider(config as OllamaProviderOptions | undefined),
+  );
   return registry;
 }
 
@@ -73,7 +88,7 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     .description("AI-powered Git Review Pipeline with Intelligent Context Building")
     .version(pkg.version)
     .option("--commit <ref>", "review a specific commit instead of the staged index")
-    .option("--provider <name>", "AI provider to use", "claude")
+    .option("--provider <name>", "AI provider to use: claude, openai, nvidia, or ollama", "claude")
     .option("--level <level>", "review level: fast, normal, or deep", "normal")
     .option(
       "--type <type>",
