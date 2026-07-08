@@ -1,18 +1,42 @@
 {
   "name": "can-i-merge",
   "version": "0.1.0",
-  "description": "AI-powered code review pipeline",
-  "main": "index.js",
-  "scripts": {
-    "test": ""
-  },
-  "keywords": [],
-  "author": "",
-  "license": "SEE LICENSE IN license",
+  "description": "AI-powered Git Review Pipeline with Intelligent Context Building",
+  "type": "module",
+  "main": "dist/index.js",
   "bin": {
-    "can-i-merge": "./dist/index.js"
+    "can-i-merge": "dist/index.js"
   },
   "files": [
     "dist"
-  ]
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "test": ""
+  },
+  "keywords": [
+    "ai",
+    "code-review",
+    "git",
+    "cli",
+    "claude"
+  ],
+  "author": "kjh9211",
+  "license": "SEE LICENSE IN license",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "commander": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "tsx": "^4.23.0",
+    "typescript": "^6.0.3"
+  }
 }
