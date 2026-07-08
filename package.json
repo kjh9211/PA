@@ -32,7 +32,8 @@
   "license": "SEE LICENSE IN license",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
-    "commander": "^15.0.0"
+    "commander": "^15.0.0",
+    "openai": "^6.45.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
