@@ -3,3 +3,4 @@ index.ts
 tsconfig.json
 package-lock.json
 CLAUDE.md
+.env
