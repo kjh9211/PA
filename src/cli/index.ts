@@ -11,6 +11,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 
+import { clearProviderConfig, loadProviderConfig, saveProviderConfig } from "../config/index.js";
 import { NoChangesError, runReview, type ReviewStage } from "../core/index.js";
 import { isGitRepository } from "../git/index.js";
 import { ProviderRegistry } from "../provider/index.js";
@@ -40,6 +41,13 @@ const STAGE_MESSAGES: Record<ReviewStage, string> = {
   analyzing: "Analyzing Git Diff...",
   context: "Building Context...",
   reviewing: "Reviewing...",
+};
+
+const PROVIDER_ENV_VARS: Record<string, { apiKey: string; model: string }> = {
+  claude: { apiKey: "ANTHROPIC_API_KEY", model: "ANTHROPIC_MODEL" },
+  openai: { apiKey: "OPENAI_API_KEY", model: "OPENAI_MODEL" },
+  nvidia: { apiKey: "NVIDIA_API_KEY", model: "NVIDIA_MODEL" },
+  ollama: { apiKey: "OLLAMA_API_KEY", model: "OLLAMA_MODEL" },
 };
 
 function isReviewLevel(value: string): value is ReviewLevel {
@@ -74,6 +82,9 @@ function buildProviderRegistry(): ProviderRegistry {
 interface CliOptions {
   commit?: string;
   provider: string;
+  apiKey?: string;
+  model?: string;
+  forgetCredentials: boolean;
   level: string;
   type: string;
   json: boolean;
@@ -89,6 +100,16 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     .version(pkg.version)
     .option("--commit <ref>", "review a specific commit instead of the staged index")
     .option("--provider <name>", "AI provider to use: claude, openai, nvidia, or ollama", "claude")
+    .option(
+      "--api-key <key>",
+      "API key for the selected provider (saved encrypted for future runs)",
+    )
+    .option("--model <model>", "model name for the selected provider (saved for future runs)")
+    .option(
+      "--forget-credentials",
+      "remove stored credentials for the selected provider and exit",
+      false,
+    )
     .option("--level <level>", "review level: fast, normal, or deep", "normal")
     .option(
       "--type <type>",
@@ -100,6 +121,12 @@ export async function main(argv: string[] = process.argv): Promise<void> {
 
   program.parse(argv);
   const opts = program.opts<CliOptions>();
+
+  if (opts.forgetCredentials) {
+    clearProviderConfig(opts.provider);
+    console.log(colors.green(`Removed stored credentials for provider "${opts.provider}".`));
+    return;
+  }
 
   if (opts.fix) {
     console.error(colors.yellow("--fix is not supported yet (see TOBE.md roadmap, Phase 4)."));
@@ -130,11 +157,25 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     return;
   }
 
+  if (opts.apiKey !== undefined || opts.model !== undefined) {
+    saveProviderConfig(opts.provider, { apiKey: opts.apiKey, model: opts.model });
+    if (!opts.json) {
+      console.log(
+        colors.dim(`Saved ${opts.provider} credentials to ~/.can-i-merge (encrypted).`),
+      );
+    }
+  }
+
+  const stored = loadProviderConfig(opts.provider);
+  const envVars = PROVIDER_ENV_VARS[opts.provider];
+  const apiKey = opts.apiKey ?? (envVars && process.env[envVars.apiKey]) ?? stored.apiKey;
+  const model = opts.model ?? (envVars && process.env[envVars.model]) ?? stored.model;
+
   const registry = buildProviderRegistry();
 
   let provider;
   try {
-    provider = registry.create(opts.provider);
+    provider = registry.create(opts.provider, { apiKey, model });
   } catch (err) {
     console.error(colors.red(err instanceof Error ? err.message : String(err)));
     process.exitCode = 2;
