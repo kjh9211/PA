@@ -190,6 +190,22 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     return;
   }
 
+  const knownProviderEnvVars = PROVIDER_ENV_VARS[opts.provider];
+  if (opts.baseUrl !== undefined && knownProviderEnvVars && !knownProviderEnvVars.baseURL) {
+    const withBaseURL = Object.entries(PROVIDER_ENV_VARS)
+      .filter(([, vars]) => vars.baseURL)
+      .map(([name]) => name)
+      .join(", ");
+    console.error(
+      colors.red(
+        `--base-url is not supported by provider "${opts.provider}" (it has no custom endpoint ` +
+          `concept). Did you forget --provider? Providers that accept --base-url: ${withBaseURL}.`,
+      ),
+    );
+    process.exitCode = 2;
+    return;
+  }
+
   if (opts.apiKey !== undefined || opts.model !== undefined || opts.baseUrl !== undefined) {
     saveProviderConfig(opts.provider, {
       apiKey: opts.apiKey,
