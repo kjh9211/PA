@@ -1,6 +1,6 @@
 {
   "name": "can-i-merge",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "description": "AI-powered Git Review Pipeline with Intelligent Context Building",
   "type": "module",
   "main": "dist/index.js",

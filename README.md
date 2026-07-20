@@ -47,9 +47,11 @@ The **Context Engine** is the real product.
     - OpenAI
     - NVIDIA
     - Gemini
-    - Ollama
+    - Ollama (local LLM)
     - OpenRouter
+    - Custom (any OpenAI-compatible endpoint, including self-hosted/local LLM servers)
 - Provider abstraction
+- Encrypted local credential storage (`--api-key`/`--model`/`--base-url`, saved for future runs)
 - GitHub Action (Planned)
 - VSCode Extension (Planned)
 - MCP Server (Planned)
@@ -110,6 +112,26 @@ Choose AI provider
 
 ```bash
 can-i-merge --provider claude
+```
+
+Use a local LLM (e.g. Ollama)
+
+```bash
+can-i-merge --provider ollama --model llama3.1
+```
+
+Point at any custom OpenAI-compatible endpoint (self-hosted, local server, etc.)
+
+```bash
+can-i-merge --provider custom --base-url http://localhost:1234/v1 --model local-model
+```
+
+API key / model / base URL are saved encrypted under `~/.can-i-merge` after the first run, so later runs don't need the flags again:
+
+```bash
+can-i-merge --provider openai --api-key sk-... --model gpt-4.1   # saved
+can-i-merge --provider openai                                    # reuses the saved key/model
+can-i-merge --provider openai --forget-credentials                # removes them
 ```
 
 Security review
@@ -200,6 +222,9 @@ Move authorization check before JWT validation.
        │ NVIDIA                   │
        │ Gemini                   │
        │ Ollama                   │
+       │ OpenRouter               │
+       │ Custom (any OpenAI-      │
+       │   compatible endpoint)   │
        └──────────────────────────┘
                        │
                        ▼

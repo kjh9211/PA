@@ -16,9 +16,12 @@ import { NoChangesError, runReview, type ReviewStage } from "../core/index.js";
 import { isGitRepository } from "../git/index.js";
 import { ProviderRegistry } from "../provider/index.js";
 import { ClaudeProvider, type ClaudeProviderOptions } from "../provider-anthropic/index.js";
+import { CustomProvider, type CustomProviderOptions } from "../provider-custom/index.js";
+import { GeminiProvider, type GeminiProviderOptions } from "../provider-gemini/index.js";
 import { NvidiaProvider, type NvidiaProviderOptions } from "../provider-nvidia/index.js";
 import { OllamaProvider, type OllamaProviderOptions } from "../provider-ollama/index.js";
 import { OpenAIProvider, type OpenAIProviderOptions } from "../provider-openai/index.js";
+import { OpenRouterProvider, type OpenRouterProviderOptions } from "../provider-openrouter/index.js";
 import { isMergeReady, reportConsole, reportJson } from "../reporter/index.js";
 import { colors } from "../shared/colors.js";
 import type { ReviewLevel, ReviewType } from "../shared/types.js";
@@ -43,11 +46,18 @@ const STAGE_MESSAGES: Record<ReviewStage, string> = {
   reviewing: "Reviewing...",
 };
 
-const PROVIDER_ENV_VARS: Record<string, { apiKey: string; model: string }> = {
+const PROVIDER_ENV_VARS: Record<string, { apiKey: string; model: string; baseURL?: string }> = {
   claude: { apiKey: "ANTHROPIC_API_KEY", model: "ANTHROPIC_MODEL" },
-  openai: { apiKey: "OPENAI_API_KEY", model: "OPENAI_MODEL" },
-  nvidia: { apiKey: "NVIDIA_API_KEY", model: "NVIDIA_MODEL" },
-  ollama: { apiKey: "OLLAMA_API_KEY", model: "OLLAMA_MODEL" },
+  openai: { apiKey: "OPENAI_API_KEY", model: "OPENAI_MODEL", baseURL: "OPENAI_BASE_URL" },
+  nvidia: { apiKey: "NVIDIA_API_KEY", model: "NVIDIA_MODEL", baseURL: "NVIDIA_BASE_URL" },
+  ollama: { apiKey: "OLLAMA_API_KEY", model: "OLLAMA_MODEL", baseURL: "OLLAMA_BASE_URL" },
+  gemini: { apiKey: "GEMINI_API_KEY", model: "GEMINI_MODEL", baseURL: "GEMINI_BASE_URL" },
+  openrouter: {
+    apiKey: "OPENROUTER_API_KEY",
+    model: "OPENROUTER_MODEL",
+    baseURL: "OPENROUTER_BASE_URL",
+  },
+  custom: { apiKey: "CUSTOM_API_KEY", model: "CUSTOM_MODEL", baseURL: "CUSTOM_BASE_URL" },
 };
 
 function isReviewLevel(value: string): value is ReviewLevel {
@@ -76,6 +86,18 @@ function buildProviderRegistry(): ProviderRegistry {
     "ollama",
     (config) => new OllamaProvider(config as OllamaProviderOptions | undefined),
   );
+  registry.register(
+    "gemini",
+    (config) => new GeminiProvider(config as GeminiProviderOptions | undefined),
+  );
+  registry.register(
+    "openrouter",
+    (config) => new OpenRouterProvider(config as OpenRouterProviderOptions | undefined),
+  );
+  registry.register(
+    "custom",
+    (config) => new CustomProvider(config as CustomProviderOptions | undefined),
+  );
   return registry;
 }
 
@@ -84,6 +106,7 @@ interface CliOptions {
   provider: string;
   apiKey?: string;
   model?: string;
+  baseUrl?: string;
   forgetCredentials: boolean;
   level: string;
   type: string;
@@ -99,12 +122,22 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     .description("AI-powered Git Review Pipeline with Intelligent Context Building")
     .version(pkg.version)
     .option("--commit <ref>", "review a specific commit instead of the staged index")
-    .option("--provider <name>", "AI provider to use: claude, openai, nvidia, or ollama", "claude")
+    .option(
+      "--provider <name>",
+      "AI provider to use: claude, openai, nvidia, ollama, gemini, openrouter, or custom " +
+        "(any OpenAI-compatible endpoint, including local LLM servers)",
+      "claude",
+    )
     .option(
       "--api-key <key>",
       "API key for the selected provider (saved encrypted for future runs)",
     )
     .option("--model <model>", "model name for the selected provider (saved for future runs)")
+    .option(
+      "--base-url <url>",
+      "API base URL for the selected provider, e.g. a local LLM server or other " +
+        "OpenAI-compatible endpoint (saved for future runs; required for --provider custom)",
+    )
     .option(
       "--forget-credentials",
       "remove stored credentials for the selected provider and exit",
@@ -157,8 +190,12 @@ export async function main(argv: string[] = process.argv): Promise<void> {
     return;
   }
 
-  if (opts.apiKey !== undefined || opts.model !== undefined) {
-    saveProviderConfig(opts.provider, { apiKey: opts.apiKey, model: opts.model });
+  if (opts.apiKey !== undefined || opts.model !== undefined || opts.baseUrl !== undefined) {
+    saveProviderConfig(opts.provider, {
+      apiKey: opts.apiKey,
+      model: opts.model,
+      baseURL: opts.baseUrl,
+    });
     if (!opts.json) {
       console.log(
         colors.dim(`Saved ${opts.provider} credentials to ~/.can-i-merge (encrypted).`),
@@ -170,12 +207,16 @@ export async function main(argv: string[] = process.argv): Promise<void> {
   const envVars = PROVIDER_ENV_VARS[opts.provider];
   const apiKey = opts.apiKey ?? (envVars && process.env[envVars.apiKey]) ?? stored.apiKey;
   const model = opts.model ?? (envVars && process.env[envVars.model]) ?? stored.model;
+  const baseURL =
+    opts.baseUrl ??
+    (envVars?.baseURL && process.env[envVars.baseURL]) ??
+    stored.baseURL;
 
   const registry = buildProviderRegistry();
 
   let provider;
   try {
-    provider = registry.create(opts.provider, { apiKey, model });
+    provider = registry.create(opts.provider, { apiKey, model, baseURL });
   } catch (err) {
     console.error(colors.red(err instanceof Error ? err.message : String(err)));
     process.exitCode = 2;

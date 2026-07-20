@@ -34,6 +34,7 @@ interface EncryptedValue {
 interface StoredProviderConfig {
   apiKey?: EncryptedValue;
   model?: string;
+  baseURL?: string;
 }
 
 type CredentialsFile = Record<string, StoredProviderConfig>;
@@ -41,6 +42,7 @@ type CredentialsFile = Record<string, StoredProviderConfig>;
 export interface ProviderConfig {
   apiKey?: string;
   model?: string;
+  baseURL?: string;
 }
 
 function ensureConfigDir(): void {
@@ -96,7 +98,7 @@ function writeCredentialsFile(contents: CredentialsFile): void {
   writeFileSync(CREDENTIALS_FILE, JSON.stringify(contents, null, 2), { mode: 0o600 });
 }
 
-/** Persist an API key and/or model for a provider, encrypting the API key at rest. */
+/** Persist an API key, model, and/or base URL for a provider, encrypting the API key at rest. */
 export function saveProviderConfig(provider: string, config: ProviderConfig): void {
   const file = readCredentialsFile();
   const next: StoredProviderConfig = { ...file[provider] };
@@ -107,12 +109,15 @@ export function saveProviderConfig(provider: string, config: ProviderConfig): vo
   if (config.model !== undefined) {
     next.model = config.model;
   }
+  if (config.baseURL !== undefined) {
+    next.baseURL = config.baseURL;
+  }
 
   file[provider] = next;
   writeCredentialsFile(file);
 }
 
-/** Load a previously persisted API key/model for a provider, decrypting the API key. */
+/** Load a previously persisted API key/model/base URL for a provider, decrypting the API key. */
 export function loadProviderConfig(provider: string): ProviderConfig {
   const stored = readCredentialsFile()[provider];
   if (!stored) {
@@ -130,6 +135,9 @@ export function loadProviderConfig(provider: string): ProviderConfig {
   }
   if (stored.model) {
     result.model = stored.model;
+  }
+  if (stored.baseURL) {
+    result.baseURL = stored.baseURL;
   }
   return result;
 }
